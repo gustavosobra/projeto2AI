@@ -6,6 +6,7 @@
 /// @copyright [MPLv2](http://mozilla.org/MPL/2.0/)
 
 using System.Threading;
+using UnityEngine;
 
 /// <summary>
 /// Implementation of an AI that will always play in sequence, from the first
@@ -15,7 +16,10 @@ using System.Threading;
 public class G10NossaAIThinker : IThinker
 {
     // Last column played
-    private int lastCol = -1;
+    private int numMoves;
+    private int lastCol;
+    private int myDepth = 0;
+    PShape shape = PShape.Round;
 
     /// @copydoc IThinker.Think
     /// <seealso cref="IThinker.Think"/>
@@ -24,34 +28,67 @@ public class G10NossaAIThinker : IThinker
         // The move to perform
         FutureMove move;
 
-        // Find next free column where to play
-        do
-        {
-            // Get next column
-            lastCol++;
-            if (lastCol >= board.cols) lastCol = 0;
-            // Is this task to be cancelled?
-            if (ct.IsCancellationRequested) return FutureMove.NoMove;
-        }
-        while (board.IsColumnFull(lastCol));
+        // Is this task to be cancelled?
+        if (ct.IsCancellationRequested) return FutureMove.NoMove;
 
-        // Try to use a round piece first
-        if (board.PieceCount(board.Turn, PShape.Round) > 0)
-        {
-            move = new FutureMove(lastCol, PShape.Round);
-        }
-        // If there's no round pieces left, let's try a square pieces
-        else if (board.PieceCount(board.Turn, PShape.Square) > 0)
-        {
-            move = new FutureMove(lastCol, PShape.Square);
-        }
-        // Otherwise return a "no move" (this should never happen)
-        else
-        {
-            move = FutureMove.NoMove;
-        }
+        move = Negamax(board, PColor.Red, 4, ct);
+
 
         // Return move
         return move;
+    }
+
+    public FutureMove Negamax(Board board, PColor turn, int depth, CancellationToken ct)
+    {
+            FutureMove bestMove = default;
+            PColor proxTurn =
+                turn == PColor.White ? PColor.Red : PColor.White;
+
+        if (ct.IsCancellationRequested)
+            return FutureMove.NoMove;
+        else
+        {
+            if (myDepth == depth)
+                return bestMove;
+
+            myDepth++;
+
+            for (int i = 0; i < board.cols; i++)
+            {
+                for (int j = 0; j < board.rows; j++)
+                {
+                    Vector2Int pos = new Vector2Int(i, j);
+
+                    if(board[i, j] == null)
+                    {
+                        int roundPieces = board.PieceCount(board.Turn, PShape.Round);
+
+                        int squarePieces = board.PieceCount(board.Turn, PShape.Square);
+
+                        if (shape == PShape.Round)
+                            if (roundPieces == 0)
+                                shape = PShape.Square;
+                            else
+                            if (squarePieces == 0)
+                                shape = PShape.Round;
+
+                        FutureMove move = default;
+
+                        board.DoMove(shape, i);
+
+                        if (board.CheckWinner() == Winner.None)
+                            move = Negamax(board, proxTurn, depth, ct);
+
+                        board.UndoMove();
+
+                    }
+                }
+            }
+                    /*if (board.Turn == PColor.Red)
+                        bestMove = new FutureMove(board.cols - 1, PShape.Round);
+                    else
+                        bestMove = new FutureMove(0, PShape.Round);*/
+                }
+        return bestMove;
     }
 }
